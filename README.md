@@ -1,8 +1,8 @@
 # plex-backup
 
-![Version](https://img.shields.io/badge/version-0.1.0-blue) ![Platform](https://img.shields.io/badge/platform-Linux-lightgrey) ![Shell](https://img.shields.io/badge/shell-bash-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-green)
+![Version](https://img.shields.io/badge/version-0.2.0-blue) ![Platform](https://img.shields.io/badge/platform-Linux-lightgrey) ![Shell](https://img.shields.io/badge/shell-bash-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-green)
 
-A minimal bash script to back up Plex Media Server configuration and databases to a NAS. No media files — just the data that's hard to replace.
+A minimal bash solution to back up Plex Media Server configuration and databases to a NAS. No media files — just the data that's hard to replace.
 
 ---
 
@@ -64,81 +64,76 @@ Plex is restarted even if rsync fails, so a bad backup run never leaves Plex off
 |---|---|
 | Linux (Debian/Ubuntu recommended) | Tested on Debian 12 |
 | Plex Media Server | Managed via systemd |
-| rsync | `apt install rsync` |
-| curl | Required for ntfy alerting; `apt install curl` |
+| rsync | `apt install rsync` — setup.sh will offer to install |
+| curl | Required for ntfy alerting — setup.sh will offer to install |
 | A backup destination | NFS mount, SMB mount, or local path |
 
 ---
 
 ## Installation
 
-```bash
-cp plex-backup.sh.example plex-backup.sh
-chmod 700 plex-backup.sh
-```
-
-Edit the CONFIG section at the top of `plex-backup.sh` for your environment, then run a syntax check:
+Clone the repo and run the setup wizard as root or with sudo:
 
 ```bash
-bash -n plex-backup.sh && echo "Syntax OK"
+git clone https://github.com/sfaith/plex-backup
+cd plex-backup
+sudo bash setup.sh
 ```
 
-Run a dry-run rsync to verify paths before your first live run:
+The wizard will:
+1. Check for required tools and offer to install any that are missing
+2. Walk through all configuration interactively with defaults and examples
+3. Configure an NFS mount and fstab entry (if applicable)
+4. Write `/etc/plex-backup/plex-backup.conf`
+5. Install scripts to `/usr/local/bin/` (or a path of your choosing)
+6. Write cron entries to root's crontab
 
-```bash
-rsync -aHv --dry-run --no-owner --no-group --no-perms \
-    --exclude="Cache/" \
-    --exclude="Caches/" \
-    --exclude="Crash Reports/" \
-    --exclude="Logs/" \
-    --exclude="Plug-in Support/Caches/" \
-    "/var/lib/plexmediaserver/Library/Application Support/Plex Media Server/" \
-    "/your/backup/destination/" | head -50
-```
+setup.sh is safe to re-run at any time to reconfigure or reinstall.
 
 ---
 
 ## Configuration
 
-All configuration lives in the `CONFIG` block at the top of each script:
+All configuration lives in `/etc/plex-backup/plex-backup.conf`, written by `setup.sh`. You can edit it directly at any time — no need to re-run setup.sh for simple changes.
 
-### plex-backup.sh
+```bash
+sudo nano /etc/plex-backup/plex-backup.conf
+```
 
 | Variable | Description | Default |
 |---|---|---|
 | `PLEX_DATA` | Path to Plex Media Server data directory | `/var/lib/plexmediaserver/Library/Application Support/Plex Media Server` |
-| `BACKUP_DEST` | Destination path for backup | `/mnt/nfs/your-nas/backups/Plex` |
-| `LOG_DIR` | Directory for log files | `/var/log/plex-backup` |
 | `PLEX_SERVICE` | systemd service name for Plex | `plexmediaserver` |
+| `BACKUP_DEST` | Destination path for backup | *(set by setup.sh)* |
+| `NFS_EXPORT` | NFS export path — leave blank if not using NFS | `""` |
+| `NFS_MOUNT_POINT` | NFS local mount point | `""` |
+| `NFS_OPTS` | NFS mount options | `vers=3,soft,...` |
+| `LOG_DIR` | Directory for log files | `/var/log/plex-backup` |
 | `LOG_RETAIN_DAYS` | Days to keep log files | `7` |
+| `WARN_AGE_HOURS` | Warn if backup is older than this many hours | `25` |
 | `NTFY_TOPIC` | ntfy topic name — set to `""` to disable | `""` |
 | `NTFY_URL` | ntfy server URL | `https://ntfy.sh` |
 | `NTFY_ON_FAILURE` | Send alert on backup failure | `true` |
 | `NTFY_ON_SUCCESS` | Send alert on backup success | `false` |
 
-### plex-backup-validate.sh
-
-| Variable | Description | Default |
-|---|---|---|
-| `BACKUP_ROOT` | Root path of the Plex backup on your NAS | `/mnt/nfs/your-nas/backups/Plex` |
-| `LOG_DIR` | Directory for log files | `/var/log/plex-backup` |
-| `WARN_AGE_HOURS` | Warn if backup is older than this many hours | `25` |
-| `LOG_RETAIN_DAYS` | Days to keep log files | `7` |
-| `NTFY_TOPIC` | ntfy topic name — set to `""` to disable | `""` |
-| `NTFY_URL` | ntfy server URL | `https://ntfy.sh` |
-| `NTFY_ON_FAILURE` | Send alert on validation failure | `true` |
-| `NTFY_ON_SUCCESS` | Send alert on validation success | `false` |
-
 ---
 
 ## Scheduling
 
-Add to root's crontab (`crontab -e`). The example below runs the backup at 3:00 AM and validation 30 minutes later (adjust UTC offset for your timezone):
+setup.sh writes cron entries to root's crontab automatically. To review or modify them:
+
+```bash
+sudo crontab -e
+```
+
+The default schedule runs the backup at 10:00 UTC (3:00 AM MST) with validation 30 minutes later:
 
 ```
-0 10 * * * /bin/bash /root/scripts/plex-backup.sh
-30 10 * * * /bin/bash /root/scripts/plex-backup-validate.sh
+0 10 * * * /bin/bash /usr/local/bin/plex-backup.sh
+30 10 * * * /bin/bash /usr/local/bin/plex-backup-validate.sh
 ```
+
+Adjust the UTC hour to match your preferred local time.
 
 ---
 
@@ -151,13 +146,19 @@ Add to root's crontab (`crontab -e`). The example below runs the backup at 3:00 
 - **Required files** — confirms critical databases and Preferences.xml are present and reports their size
 - **Total backup size** — gross sanity check
 
+To run manually:
+
+```bash
+sudo /usr/local/bin/plex-backup-validate.sh
+```
+
 **Note on SQLite integrity checks:** Plex's main library databases use a proprietary SQLite tokenizer that the system `sqlite3` binary does not support. Integrity checks against these files always fail with `unknown tokenizer: collating` regardless of whether the data is corrupt. This is a Plex limitation, not a script deficiency — the validate script documents this decision in its header comments.
 
 ---
 
 ## Alerting
 
-Both scripts support [ntfy](https://ntfy.sh) push notifications. Set `NTFY_TOPIC` to your topic name to enable:
+Both scripts support [ntfy](https://ntfy.sh) push notifications. Set `NTFY_TOPIC` in `/etc/plex-backup/plex-backup.conf` to enable:
 
 ```bash
 NTFY_TOPIC="your-topic-name"
@@ -189,5 +190,4 @@ tail -20 /var/log/plex-backup/plex-validate-$(date +%Y-%m-%d).log
 ## Planned
 
 - `plex-restore.sh` — restore from NAS backup, fix file ownership, restart Plex
-- `plex-backup.conf` — shared config file sourced by all scripts (eliminates duplicate config blocks)
 - Tautulli backup support — optional, toggled via `TAUTULLI_ENABLED`
