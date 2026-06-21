@@ -1,4 +1,4 @@
-# PlexBackup
+# plex-backup
 
 ![Version](https://img.shields.io/badge/version-0.1.0-blue) ![Platform](https://img.shields.io/badge/platform-Linux-lightgrey) ![Shell](https://img.shields.io/badge/shell-bash-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-green)
 
@@ -42,6 +42,8 @@ A minimal bash script to back up Plex Media Server configuration and databases t
 5. Logs the run and prunes old logs
 
 Plex is restarted even if rsync fails, so a bad backup run never leaves Plex offline.
+
+> **Note:** The first backup will transfer your entire Plex data directory and may take several hours depending on library size and NAS speed. Subsequent runs are incremental and typically complete in a few minutes.
 
 ---
 
