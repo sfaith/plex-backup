@@ -42,7 +42,8 @@ A minimal bash script to back up Plex Media Server configuration and databases t
 2. Stops Plex Media Server
 3. Runs rsync to the backup destination (single rolling copy — previous backup is overwritten)
 4. Restarts Plex Media Server regardless of rsync result
-5. Logs the run and prunes old logs
+5. Sends ntfy alert on failure or success (if configured)
+6. Logs the run and prunes old logs
 
 **plex-backup-validate.sh** (run separately, zero Plex downtime):
 1. Checks that the backup destination is mounted and reachable
