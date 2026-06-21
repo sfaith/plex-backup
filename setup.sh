@@ -160,7 +160,8 @@ fi
 # Plex service name
 CFG_PLEX_SERVICE="plexmediaserver"
 prompt CFG_PLEX_SERVICE "Plex systemd service " "${CFG_PLEX_SERVICE}"
-if systemctl list-units --type=service --all --no-pager 2>/dev/null | grep -q "${CFG_PLEX_SERVICE}"; then
+if systemctl is-active --quiet "${CFG_PLEX_SERVICE}" 2>/dev/null || \
+   systemctl is-enabled --quiet "${CFG_PLEX_SERVICE}" 2>/dev/null; then
   success "Service '${CFG_PLEX_SERVICE}' found."
 else
   warn "Service '${CFG_PLEX_SERVICE}' not detected — verify with: systemctl list-units --type=service | grep -i plex"
