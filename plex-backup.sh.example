@@ -1,33 +1,20 @@
 #!/bin/bash
 # plex-backup.sh — Stop Plex, rsync config/DBs to NAS, restart Plex
-# Single rolling copy — edit the Config section below to adapt to your environment.
-# Copy this file to plex-backup.sh and fill in your values before running.
+# Single rolling copy. Configuration is read from /etc/plex-backup/plex-backup.conf
+# Copy this file to plex-backup.sh before running — do not run the .example directly.
 
-# =============================================================================
-# CONFIG — edit these values for your environment
-# =============================================================================
+set -euo pipefail
 
-# Full path to Plex Media Server data directory
-PLEX_DATA="/var/lib/plexmediaserver/Library/Application Support/Plex Media Server"
+CONF_FILE="/etc/plex-backup/plex-backup.conf"
 
-# Destination path on your backup target (NFS mount, local path, etc.)
-BACKUP_DEST="/mnt/nfs/your-nas/backups/Plex"
+if [ ! -f "${CONF_FILE}" ]; then
+    echo "ERROR: Config file not found: ${CONF_FILE}"
+    echo "Run setup.sh or copy plex-backup.conf.example to ${CONF_FILE} and edit it."
+    exit 1
+fi
 
-# Directory to write backup logs
-LOG_DIR="/var/log/plex-backup"
-
-# systemd service name for Plex Media Server
-PLEX_SERVICE="plexmediaserver"
-
-# Number of days to retain backup logs
-LOG_RETAIN_DAYS=7
-
-# ntfy alerting — set NTFY_TOPIC="" to disable
-# See https://ntfy.sh for setup instructions
-NTFY_TOPIC=""
-NTFY_URL="https://ntfy.sh"
-NTFY_ON_FAILURE=true
-NTFY_ON_SUCCESS=false
+# shellcheck source=/dev/null
+source "${CONF_FILE}"
 
 # =============================================================================
 # DERIVED — do not edit below this line
@@ -66,7 +53,6 @@ if ! systemctl stop "${PLEX_SERVICE}"; then
     echo "[$(date)] WARNING: systemctl stop returned non-zero — service may already be stopped"
 fi
 
-# Wait for service to fully stop (up to 30 seconds)
 STOP_WAIT=0
 while systemctl is-active --quiet "${PLEX_SERVICE}" && [ ${STOP_WAIT} -lt 30 ]; do
     sleep 1
@@ -104,7 +90,7 @@ fi
 # --- Check rsync result ---
 if [ ${RSYNC_EXIT} -ne 0 ]; then
     echo "[$(date)] ERROR: rsync exited with code ${RSYNC_EXIT}"
-    [ "${NTFY_ON_FAILURE}" = "true" ] && ntfy_send "Plex Backup FAILED" "rsync error (code ${RSYNC_EXIT}) — check /var/log/plex-backup on plex server" "high"
+    [ "${NTFY_ON_FAILURE}" = "true" ] && ntfy_send "Plex Backup FAILED" "rsync error (code ${RSYNC_EXIT}) — check ${LOG_DIR} on plex server" "high"
     exit ${RSYNC_EXIT}
 fi
 
