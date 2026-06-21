@@ -160,7 +160,7 @@ fi
 # Plex service name
 CFG_PLEX_SERVICE="plexmediaserver"
 prompt CFG_PLEX_SERVICE "Plex systemd service " "${CFG_PLEX_SERVICE}"
-if systemctl list-units --type=service --all 2>/dev/null | grep -q "${CFG_PLEX_SERVICE}"; then
+if systemctl list-units --type=service --all --no-pager 2>/dev/null | grep -q "${CFG_PLEX_SERVICE}"; then
   success "Service '${CFG_PLEX_SERVICE}' found."
 else
   warn "Service '${CFG_PLEX_SERVICE}' not detected — verify with: systemctl list-units --type=service | grep -i plex"
@@ -174,11 +174,15 @@ CFG_BACKUP_DEST=""
 
 echo
 if confirm "Is your backup destination on an NFS share?"; then
-  prompt CFG_NFS_EXPORT      "NFS export         " "${CFG_NFS_EXPORT}"      "192.168.1.93:/volume1/Backups"
-  prompt CFG_NFS_MOUNT_POINT "NFS mount point    " "${CFG_NFS_MOUNT_POINT}" "/mnt/nfs/nas03/backups"
+  while [[ -z "${CFG_NFS_EXPORT}" ]]; do
+    prompt CFG_NFS_EXPORT      "NFS export         " "${CFG_NFS_EXPORT}"      "192.168.1.93:/volume1/Backups"
+    [[ -z "${CFG_NFS_EXPORT}" ]] && warn "NFS export is required."
+  done
+  while [[ -z "${CFG_NFS_MOUNT_POINT}" ]]; do
+    prompt CFG_NFS_MOUNT_POINT "NFS mount point    " "${CFG_NFS_MOUNT_POINT}" "/mnt/nfs/nas03/backups"
+    [[ -z "${CFG_NFS_MOUNT_POINT}" ]] && warn "NFS mount point is required."
+  done
   prompt CFG_NFS_OPTS        "NFS mount options  " "${CFG_NFS_OPTS}"
-  [[ -z "${CFG_NFS_EXPORT}" ]]      && error "NFS export is required."
-  [[ -z "${CFG_NFS_MOUNT_POINT}" ]] && error "NFS mount point is required."
   CFG_BACKUP_DEST="${CFG_NFS_MOUNT_POINT}/Plex"
   prompt CFG_BACKUP_DEST "Backup destination " "${CFG_BACKUP_DEST}"
 else
