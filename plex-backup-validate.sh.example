@@ -85,20 +85,24 @@ ntfy_send() {
 # --- Mount check ---
 if ! mountpoint -q "$(dirname "${BACKUP_ROOT}")"; then
     echo "[$(date)] ERROR: NFS mount not available. Aborting."
-    ${NTFY_ON_FAILURE} && ntfy_send "Plex Validate FAILED" "NFS mount not available" "high"
+    [ "${NTFY_ON_FAILURE}" = "true" ] && ntfy_send "Plex Validate FAILED" "NFS mount not available — validation did not run" "high"
     exit 1
 fi
 
-# --- Resolve snapshot ---
+# --- Validate date argument if provided ---
 if [ -n "$1" ]; then
+    if ! echo "$1" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
+        echo "[$(date)] ERROR: Invalid date format '$1' — expected YYYY-MM-DD"
+        exit 1
+    fi
     SNAPSHOT="${BACKUP_ROOT}/$1"
 else
     SNAPSHOT="${BACKUP_ROOT}"
 fi
 
 if [ ! -d "${SNAPSHOT}" ]; then
-    echo "[$(date)] ERROR: Snapshot not found at ${SNAPSHOT}"
-    ${NTFY_ON_FAILURE} && ntfy_send "Plex Validate FAILED" "Snapshot not found at ${SNAPSHOT}" "high"
+    echo "[$(date)] ERROR: Backup not found for requested date — check ${BACKUP_ROOT}"
+    [ "${NTFY_ON_FAILURE}" = "true" ] && ntfy_send "Plex Validate FAILED" "Backup not found — check NAS" "high"
     exit 1
 fi
 
@@ -108,7 +112,8 @@ echo "[$(date)] Validating: ${SNAPSHOT}"
 NEWEST=$(find "${SNAPSHOT}" -name "Preferences.xml" -printf "%T@\n" 2>/dev/null | sort -n | tail -1)
 if [ -n "${NEWEST}" ]; then
     NOW_EPOCH=$(date +%s)
-    AGE_HOURS=$(( ($(printf "%.0f" "${NEWEST}") - NOW_EPOCH) * -1 / 3600 ))
+    NEWEST_INT=${NEWEST%.*}
+    AGE_HOURS=$(( (NOW_EPOCH - NEWEST_INT) / 3600 ))
     if [ "${AGE_HOURS}" -gt "${WARN_AGE_HOURS}" ]; then
         echo "[$(date)] WARNING: Backup is ${AGE_HOURS} hours old (threshold: ${WARN_AGE_HOURS}h)"
         EXIT_CODE=1
@@ -139,10 +144,10 @@ echo "[$(date)] Total backup size: ${TOTAL_SIZE}"
 # --- Final result ---
 if [ ${EXIT_CODE} -eq 0 ]; then
     echo "[$(date)] Validation PASSED"
-    ${NTFY_ON_SUCCESS} && ntfy_send "Plex Validate OK" "Backup validation passed — size: ${TOTAL_SIZE}" "default"
+    [ "${NTFY_ON_SUCCESS}" = "true" ] && ntfy_send "Plex Validate OK" "Backup validation passed — size: ${TOTAL_SIZE}" "default"
 else
-    echo "[$(date)] Validation FAILED — review log at ${LOG_FILE}"
-    ${NTFY_ON_FAILURE} && ntfy_send "Plex Validate FAILED" "Backup validation failed — check log at ${LOG_FILE}" "high"
+    echo "[$(date)] Validation FAILED — review log on plex server"
+    [ "${NTFY_ON_FAILURE}" = "true" ] && ntfy_send "Plex Validate FAILED" "Backup validation failed — review log on plex server" "high"
 fi
 
 # --- Prune old logs ---

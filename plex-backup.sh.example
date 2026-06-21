@@ -56,19 +56,36 @@ ntfy_send() {
 # --- Mount check ---
 if ! mountpoint -q "$(dirname "${BACKUP_DEST}")"; then
     echo "[$(date)] ERROR: NFS mount not available. Aborting."
-    ${NTFY_ON_FAILURE} && ntfy_send "Plex Backup FAILED" "NFS mount not available" "high"
+    [ "${NTFY_ON_FAILURE}" = "true" ] && ntfy_send "Plex Backup FAILED" "NFS mount not available — backup did not run" "high"
     exit 1
 fi
 
 # --- Stop Plex ---
 echo "[$(date)] Stopping ${PLEX_SERVICE}"
-systemctl stop "${PLEX_SERVICE}"
-sleep 5
+if ! systemctl stop "${PLEX_SERVICE}"; then
+    echo "[$(date)] WARNING: systemctl stop returned non-zero — service may already be stopped"
+fi
+
+# Wait for service to fully stop (up to 30 seconds)
+STOP_WAIT=0
+while systemctl is-active --quiet "${PLEX_SERVICE}" && [ ${STOP_WAIT} -lt 30 ]; do
+    sleep 1
+    STOP_WAIT=$(( STOP_WAIT + 1 ))
+done
+
+if systemctl is-active --quiet "${PLEX_SERVICE}"; then
+    echo "[$(date)] ERROR: ${PLEX_SERVICE} did not stop within 30 seconds. Aborting."
+    [ "${NTFY_ON_FAILURE}" = "true" ] && ntfy_send "Plex Backup FAILED" "Plex did not stop within 30 seconds — backup aborted" "high"
+    exit 1
+fi
+
+echo "[$(date)] ${PLEX_SERVICE} stopped after ${STOP_WAIT}s"
 
 # --- rsync ---
 echo "[$(date)] Starting rsync to ${BACKUP_DEST}"
 rsync -aH --delete \
     --no-owner --no-group --no-perms \
+    --timeout=300 \
     --exclude="Cache/" \
     --exclude="Caches/" \
     --exclude="Crash Reports/" \
@@ -79,17 +96,20 @@ RSYNC_EXIT=$?
 
 # --- Restart Plex regardless of rsync result ---
 echo "[$(date)] Starting ${PLEX_SERVICE}"
-systemctl start "${PLEX_SERVICE}"
+if ! systemctl start "${PLEX_SERVICE}"; then
+    echo "[$(date)] ERROR: Failed to start ${PLEX_SERVICE}"
+    [ "${NTFY_ON_FAILURE}" = "true" ] && ntfy_send "Plex Backup WARNING" "Backup complete but Plex failed to restart — check server" "high"
+fi
 
 # --- Check rsync result ---
 if [ ${RSYNC_EXIT} -ne 0 ]; then
     echo "[$(date)] ERROR: rsync exited with code ${RSYNC_EXIT}"
-    ${NTFY_ON_FAILURE} && ntfy_send "Plex Backup FAILED" "rsync exited with code ${RSYNC_EXIT} — check log at ${LOG_FILE}" "high"
+    [ "${NTFY_ON_FAILURE}" = "true" ] && ntfy_send "Plex Backup FAILED" "rsync error (code ${RSYNC_EXIT}) — check /var/log/plex-backup on plex server" "high"
     exit ${RSYNC_EXIT}
 fi
 
 echo "[$(date)] Backup complete"
-${NTFY_ON_SUCCESS} && ntfy_send "Plex Backup OK" "Backup completed successfully" "default"
+[ "${NTFY_ON_SUCCESS}" = "true" ] && ntfy_send "Plex Backup OK" "Backup completed successfully" "default"
 
 # --- Prune old logs ---
 find "${LOG_DIR}" -name "plex-backup-*.log" -mtime +${LOG_RETAIN_DAYS} -delete
