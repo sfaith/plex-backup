@@ -1,0 +1,72 @@
+#!/bin/bash
+# plex-backup.sh — Stop Plex, rsync config/DBs to NAS, restart Plex
+# Single rolling copy — edit the Config section below to adapt to your environment.
+# Copy this file to plex-backup.sh and fill in your values before running.
+
+# =============================================================================
+# CONFIG — edit these values for your environment
+# =============================================================================
+
+# Full path to Plex Media Server data directory
+PLEX_DATA="/var/lib/plexmediaserver/Library/Application Support/Plex Media Server"
+
+# Destination path on your backup target (NFS mount, local path, etc.)
+BACKUP_DEST="/mnt/nfs/your-nas/backups/Plex"
+
+# Directory to write backup logs
+LOG_DIR="/var/log/plex-backup"
+
+# systemd service name for Plex Media Server
+PLEX_SERVICE="plexmediaserver"
+
+# Number of days to retain backup logs
+LOG_RETAIN_DAYS=7
+
+# =============================================================================
+# DERIVED — do not edit below this line
+# =============================================================================
+DATE=$(date +%Y-%m-%d)
+LOG_FILE="${LOG_DIR}/plex-backup-${DATE}.log"
+
+mkdir -p "${LOG_DIR}"
+exec > >(tee -a "${LOG_FILE}") 2>&1
+
+echo "[$(date)] Starting Plex backup"
+
+# --- Mount check ---
+if ! mountpoint -q "$(dirname "${BACKUP_DEST}")"; then
+    echo "[$(date)] ERROR: NFS mount not available. Aborting."
+    exit 1
+fi
+
+# --- Stop Plex ---
+echo "[$(date)] Stopping ${PLEX_SERVICE}"
+systemctl stop "${PLEX_SERVICE}"
+sleep 5
+
+# --- rsync ---
+echo "[$(date)] Starting rsync to ${BACKUP_DEST}"
+rsync -aH --delete \
+    --no-owner --no-group --no-perms \
+    --exclude="Cache/" \
+    --exclude="Caches/" \
+    --exclude="Crash Reports/" \
+    --exclude="Logs/" \
+    --exclude="Plug-in Support/Caches/" \
+    "${PLEX_DATA}/" "${BACKUP_DEST}/"
+RSYNC_EXIT=$?
+
+# --- Restart Plex regardless of rsync result ---
+echo "[$(date)] Starting ${PLEX_SERVICE}"
+systemctl start "${PLEX_SERVICE}"
+
+# --- Check rsync result ---
+if [ ${RSYNC_EXIT} -ne 0 ]; then
+    echo "[$(date)] ERROR: rsync exited with code ${RSYNC_EXIT}"
+    exit ${RSYNC_EXIT}
+fi
+
+echo "[$(date)] Backup complete"
+
+# --- Prune old logs ---
+find "${LOG_DIR}" -name "plex-backup-*.log" -mtime +${LOG_RETAIN_DAYS} -delete
