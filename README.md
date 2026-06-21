@@ -64,6 +64,7 @@ Plex is restarted even if rsync fails, so a bad backup run never leaves Plex off
 |---|---|
 | Linux (Debian/Ubuntu recommended) | Tested on Debian 12 |
 | Plex Media Server | Managed via systemd |
+| git | `apt install git` — required to clone the repo |
 | rsync | `apt install rsync` — setup.sh will offer to install |
 | curl | Required for ntfy alerting — setup.sh will offer to install |
 | A backup destination | NFS mount, SMB mount, or local path |
