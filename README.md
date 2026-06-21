@@ -14,8 +14,10 @@ A minimal bash script to back up Plex Media Server configuration and databases t
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Scheduling](#scheduling)
+- [Validation](#validation)
+- [Alerting](#alerting)
 - [Logs](#logs)
-- [Planned Scripts](#planned-scripts)
+- [Planned](#planned)
 
 ---
 
@@ -54,6 +56,7 @@ Plex is restarted even if rsync fails, so a bad backup run never leaves Plex off
 | Linux (Debian/Ubuntu recommended) | Tested on Debian 12 |
 | Plex Media Server | Managed via systemd |
 | rsync | `apt install rsync` |
+| curl | Required for ntfy alerting; `apt install curl` |
 | A backup destination | NFS mount, SMB mount, or local path |
 
 ---
@@ -88,7 +91,9 @@ rsync -aHv --dry-run --no-owner --no-group --no-perms \
 
 ## Configuration
 
-All configuration lives in the `CONFIG` block at the top of `plex-backup.sh`:
+All configuration lives in the `CONFIG` block at the top of each script:
+
+### plex-backup.sh
 
 | Variable | Description | Default |
 |---|---|---|
@@ -97,38 +102,83 @@ All configuration lives in the `CONFIG` block at the top of `plex-backup.sh`:
 | `LOG_DIR` | Directory for log files | `/var/log/plex-backup` |
 | `PLEX_SERVICE` | systemd service name for Plex | `plexmediaserver` |
 | `LOG_RETAIN_DAYS` | Days to keep log files | `7` |
+| `NTFY_TOPIC` | ntfy topic name — set to `""` to disable | `""` |
+| `NTFY_URL` | ntfy server URL | `https://ntfy.sh` |
+| `NTFY_ON_FAILURE` | Send alert on backup failure | `true` |
+| `NTFY_ON_SUCCESS` | Send alert on backup success | `false` |
+
+### plex-backup-validate.sh
+
+| Variable | Description | Default |
+|---|---|---|
+| `BACKUP_ROOT` | Root path of the Plex backup on your NAS | `/mnt/nfs/your-nas/backups/Plex` |
+| `LOG_DIR` | Directory for log files | `/var/log/plex-backup` |
+| `WARN_AGE_HOURS` | Warn if backup is older than this many hours | `25` |
+| `LOG_RETAIN_DAYS` | Days to keep log files | `7` |
+| `NTFY_TOPIC` | ntfy topic name — set to `""` to disable | `""` |
+| `NTFY_URL` | ntfy server URL | `https://ntfy.sh` |
+| `NTFY_ON_FAILURE` | Send alert on validation failure | `true` |
+| `NTFY_ON_SUCCESS` | Send alert on validation success | `false` |
 
 ---
 
 ## Scheduling
 
-Add to root's crontab (`crontab -e`) to run nightly at 3:00 AM local time (adjust UTC offset for your timezone):
+Add to root's crontab (`crontab -e`). The example below runs the backup at 3:00 AM and validation 30 minutes later (adjust UTC offset for your timezone):
 
 ```
 0 10 * * * /bin/bash /root/scripts/plex-backup.sh
+30 10 * * * /bin/bash /root/scripts/plex-backup-validate.sh
 ```
+
+---
+
+## Validation
+
+`plex-backup-validate.sh` runs entirely against the NAS copy — Plex is never touched. It checks:
+
+- **NFS mount** — aborts if the backup destination is unreachable
+- **Backup age** — warns if the backup is older than `WARN_AGE_HOURS` (catches missed cron runs)
+- **Required files** — confirms critical databases and Preferences.xml are present and reports their size
+- **Total backup size** — gross sanity check
+
+**Note on SQLite integrity checks:** Plex's main library databases use a proprietary SQLite tokenizer that the system `sqlite3` binary does not support. Integrity checks against these files always fail with `unknown tokenizer: collating` regardless of whether the data is corrupt. This is a Plex limitation, not a script deficiency — the validate script documents this decision in its header comments.
+
+---
+
+## Alerting
+
+Both scripts support [ntfy](https://ntfy.sh) push notifications. Set `NTFY_TOPIC` to your topic name to enable:
+
+```bash
+NTFY_TOPIC="your-topic-name"
+NTFY_URL="https://ntfy.sh"   # change for self-hosted ntfy
+NTFY_ON_FAILURE=true
+NTFY_ON_SUCCESS=false
+```
+
+Leave `NTFY_TOPIC=""` to disable alerting entirely. `curl` must be installed.
 
 ---
 
 ## Logs
 
-Logs are written to `LOG_DIR` and named `plex-backup-YYYY-MM-DD.log`. To monitor a run in progress:
+Logs are written to `LOG_DIR` and named by date. To monitor a run in progress:
 
 ```bash
 tail -f /var/log/plex-backup/plex-backup-$(date +%Y-%m-%d).log
 ```
 
-To check the result of the last run:
+To check the result of the last validation:
 
 ```bash
-tail -20 /var/log/plex-backup/plex-backup-$(date +%Y-%m-%d).log
+tail -20 /var/log/plex-backup/plex-validate-$(date +%Y-%m-%d).log
 ```
 
 ---
 
-## Planned Scripts
+## Planned
 
-| Script | Purpose |
-|---|---|
-| `plex-restore.sh` | Restore from NAS backup, fix ownership, restart Plex |
-| `plex-backup-validate.sh` | SQLite integrity check, backup age validation, required file check |
+- `plex-restore.sh` — restore from NAS backup, fix file ownership, restart Plex
+- `plex-backup.conf` — shared config file sourced by all scripts (eliminates duplicate config blocks)
+- Tautulli backup support — optional, toggled via `TAUTULLI_ENABLED`

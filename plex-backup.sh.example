@@ -22,6 +22,13 @@ PLEX_SERVICE="plexmediaserver"
 # Number of days to retain backup logs
 LOG_RETAIN_DAYS=7
 
+# ntfy alerting — set NTFY_TOPIC="" to disable
+# See https://ntfy.sh for setup instructions
+NTFY_TOPIC=""
+NTFY_URL="https://ntfy.sh"
+NTFY_ON_FAILURE=true
+NTFY_ON_SUCCESS=false
+
 # =============================================================================
 # DERIVED — do not edit below this line
 # =============================================================================
@@ -33,9 +40,23 @@ exec > >(tee -a "${LOG_FILE}") 2>&1
 
 echo "[$(date)] Starting Plex backup"
 
+# --- ntfy helper ---
+ntfy_send() {
+    local title="$1"
+    local message="$2"
+    local priority="${3:-default}"
+    [ -z "${NTFY_TOPIC}" ] && return 0
+    curl -s -o /dev/null \
+        -H "Title: ${title}" \
+        -H "Priority: ${priority}" \
+        -d "${message}" \
+        "${NTFY_URL}/${NTFY_TOPIC}"
+}
+
 # --- Mount check ---
 if ! mountpoint -q "$(dirname "${BACKUP_DEST}")"; then
     echo "[$(date)] ERROR: NFS mount not available. Aborting."
+    ${NTFY_ON_FAILURE} && ntfy_send "Plex Backup FAILED" "NFS mount not available" "high"
     exit 1
 fi
 
@@ -63,10 +84,12 @@ systemctl start "${PLEX_SERVICE}"
 # --- Check rsync result ---
 if [ ${RSYNC_EXIT} -ne 0 ]; then
     echo "[$(date)] ERROR: rsync exited with code ${RSYNC_EXIT}"
+    ${NTFY_ON_FAILURE} && ntfy_send "Plex Backup FAILED" "rsync exited with code ${RSYNC_EXIT} — check log at ${LOG_FILE}" "high"
     exit ${RSYNC_EXIT}
 fi
 
 echo "[$(date)] Backup complete"
+${NTFY_ON_SUCCESS} && ntfy_send "Plex Backup OK" "Backup completed successfully" "default"
 
 # --- Prune old logs ---
 find "${LOG_DIR}" -name "plex-backup-*.log" -mtime +${LOG_RETAIN_DAYS} -delete

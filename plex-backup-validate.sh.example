@@ -1,0 +1,151 @@
+#!/bin/bash
+# plex-backup-validate.sh — Validate Plex backup integrity on NAS
+# Runs against NAS copy only — zero Plex downtime.
+# Usage: plex-backup-validate.sh [YYYY-MM-DD]
+# If no date given, validates flat Plex/ backup directory.
+# Copy this file to plex-backup-validate.sh and fill in your values before running.
+#
+# What this script checks and why:
+#
+#   1. NFS mount reachable     — no point validating if we can't see the backup
+#   2. Backup age              — detects missed cron runs (threshold: WARN_AGE_HOURS)
+#   3. Required files present  — confirms critical DBs and config were transferred
+#   4. Backup size             — gross sanity check; a suspiciously small backup is a red flag
+#
+# What this script does NOT check and why:
+#
+#   SQLite integrity checks (PRAGMA integrity_check / quick_check) were attempted
+#   against the two main Plex library databases but fail with "unknown tokenizer:
+#   collating" because Plex ships its own custom SQLite build with proprietary
+#   tokenizers. The system sqlite3 binary cannot check these files. Since the
+#   only DBs that pass are minor (dlna, Music Analysis), sqlite3 checks were
+#   dropped entirely to avoid false failures and misleading output.
+#
+#   File hashing was considered but rejected for this use case. With a single
+#   rolling copy, a hash manifest would be regenerated on every backup run,
+#   meaning it could only detect NAS-side bit-rot between runs — an unlikely
+#   failure mode on Synology hardware. If dated snapshots are added in future,
+#   hashing becomes more valuable and should be revisited.
+
+# =============================================================================
+# CONFIG — edit these values for your environment
+# =============================================================================
+
+# Root path of the Plex backup on your NAS
+BACKUP_ROOT="/mnt/nfs/your-nas/backups/Plex"
+
+# Directory to write validation logs
+LOG_DIR="/var/log/plex-backup"
+
+# Warn if backup is older than this many hours (should exceed backup interval)
+WARN_AGE_HOURS=25
+
+# Number of days to retain validation logs
+LOG_RETAIN_DAYS=7
+
+# Files that must exist in a valid backup
+REQUIRED_FILES=(
+    "Preferences.xml"
+    "Plug-in Support/Databases/com.plexapp.plugins.library.db"
+    "Plug-in Support/Databases/com.plexapp.plugins.library.blobs.db"
+)
+
+# ntfy alerting — set NTFY_TOPIC="" to disable
+# See https://ntfy.sh for setup instructions
+NTFY_TOPIC=""
+NTFY_URL="https://ntfy.sh"
+NTFY_ON_FAILURE=true
+NTFY_ON_SUCCESS=false
+
+# =============================================================================
+# DERIVED — do not edit below this line
+# =============================================================================
+DATE=$(date +%Y-%m-%d)
+LOG_FILE="${LOG_DIR}/plex-validate-${DATE}.log"
+EXIT_CODE=0
+
+mkdir -p "${LOG_DIR}"
+exec > >(tee -a "${LOG_FILE}") 2>&1
+
+echo "[$(date)] Starting Plex backup validation"
+
+# --- ntfy helper ---
+ntfy_send() {
+    local title="$1"
+    local message="$2"
+    local priority="${3:-default}"
+    [ -z "${NTFY_TOPIC}" ] && return 0
+    curl -s -o /dev/null \
+        -H "Title: ${title}" \
+        -H "Priority: ${priority}" \
+        -d "${message}" \
+        "${NTFY_URL}/${NTFY_TOPIC}"
+}
+
+# --- Mount check ---
+if ! mountpoint -q "$(dirname "${BACKUP_ROOT}")"; then
+    echo "[$(date)] ERROR: NFS mount not available. Aborting."
+    ${NTFY_ON_FAILURE} && ntfy_send "Plex Validate FAILED" "NFS mount not available" "high"
+    exit 1
+fi
+
+# --- Resolve snapshot ---
+if [ -n "$1" ]; then
+    SNAPSHOT="${BACKUP_ROOT}/$1"
+else
+    SNAPSHOT="${BACKUP_ROOT}"
+fi
+
+if [ ! -d "${SNAPSHOT}" ]; then
+    echo "[$(date)] ERROR: Snapshot not found at ${SNAPSHOT}"
+    ${NTFY_ON_FAILURE} && ntfy_send "Plex Validate FAILED" "Snapshot not found at ${SNAPSHOT}" "high"
+    exit 1
+fi
+
+echo "[$(date)] Validating: ${SNAPSHOT}"
+
+# --- Check backup age ---
+NEWEST=$(find "${SNAPSHOT}" -name "Preferences.xml" -printf "%T@\n" 2>/dev/null | sort -n | tail -1)
+if [ -n "${NEWEST}" ]; then
+    NOW_EPOCH=$(date +%s)
+    AGE_HOURS=$(( ($(printf "%.0f" "${NEWEST}") - NOW_EPOCH) * -1 / 3600 ))
+    if [ "${AGE_HOURS}" -gt "${WARN_AGE_HOURS}" ]; then
+        echo "[$(date)] WARNING: Backup is ${AGE_HOURS} hours old (threshold: ${WARN_AGE_HOURS}h)"
+        EXIT_CODE=1
+    else
+        echo "[$(date)] OK: Backup age is ${AGE_HOURS} hours"
+    fi
+else
+    echo "[$(date)] WARNING: Could not determine backup age"
+    EXIT_CODE=1
+fi
+
+# --- Check required files ---
+echo "[$(date)] Checking required files..."
+for f in "${REQUIRED_FILES[@]}"; do
+    if [ ! -f "${SNAPSHOT}/${f}" ]; then
+        echo "[$(date)] ERROR: Missing required file: ${f}"
+        EXIT_CODE=1
+    else
+        SIZE=$(du -sh "${SNAPSHOT}/${f}" 2>/dev/null | cut -f1)
+        echo "[$(date)] OK: ${f} (${SIZE})"
+    fi
+done
+
+# --- Backup size ---
+TOTAL_SIZE=$(du -sh "${SNAPSHOT}" 2>/dev/null | cut -f1)
+echo "[$(date)] Total backup size: ${TOTAL_SIZE}"
+
+# --- Final result ---
+if [ ${EXIT_CODE} -eq 0 ]; then
+    echo "[$(date)] Validation PASSED"
+    ${NTFY_ON_SUCCESS} && ntfy_send "Plex Validate OK" "Backup validation passed — size: ${TOTAL_SIZE}" "default"
+else
+    echo "[$(date)] Validation FAILED — review log at ${LOG_FILE}"
+    ${NTFY_ON_FAILURE} && ntfy_send "Plex Validate FAILED" "Backup validation failed — check log at ${LOG_FILE}" "high"
+fi
+
+# --- Prune old logs ---
+find "${LOG_DIR}" -name "plex-validate-*.log" -mtime +${LOG_RETAIN_DAYS} -delete
+
+exit ${EXIT_CODE}
