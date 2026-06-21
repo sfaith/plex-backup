@@ -11,8 +11,20 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
 ### Planned
 - plex-restore.sh — restore from NAS backup with ownership fix
-- plex-backup.conf — shared config file sourced by all scripts
 - Tautulli backup support (optional, toggled via TAUTULLI_ENABLED)
+
+---
+
+## [0.2.0] - 2026-06-21
+
+### Added
+- setup.sh — interactive setup wizard covering prerequisites, configuration, NFS mount, script install, and cron setup
+- plex-backup.conf.example — shared configuration file for all scripts
+
+### Changed
+- plex-backup.sh.example — refactored to source /etc/plex-backup/plex-backup.conf instead of embedding config block
+- plex-backup-validate.sh.example — refactored to source /etc/plex-backup/plex-backup.conf; renamed BACKUP_ROOT to BACKUP_DEST for consistency; added set -euo pipefail
+- Both scripts now abort with a clear message if conf file is not found
 
 ---
 
