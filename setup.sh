@@ -40,11 +40,12 @@ prompt() {
   local input
   echo -en "\n  ${label}"
   if [[ -n "${current}" ]]; then
-    echo -en " \e[2m[${current}]\e[0m"
+    echo -en " \e[2m[${current}]\e[0m (press Enter to accept): "
   elif [[ -n "${placeholder}" ]]; then
-    echo -en " \e[2m(e.g. ${placeholder})\e[0m"
+    echo -en " \e[2m(e.g. ${placeholder})\e[0m: "
+  else
+    echo -en ": "
   fi
-  echo -en " (press Enter to accept): "
   read -r input
   if [[ -n "${input}" ]]; then
     printf -v "${var}" '%s' "${input}"
