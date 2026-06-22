@@ -11,7 +11,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
 ### Planned
 - plex-restore.sh — restore from NAS backup with ownership fix
-- setup.sh — detect existing conf and offer reuse/selective update instead of reprompting everything
+
+---
+
+## [0.3.2] - 2026-06-21
+
+### Changed
+- setup.sh now detects an existing conf file and offers three modes: reinstall as-is (skip all prompts), update a specific section, or full reconfigure
+- In update mode, a numbered section selector lets you reprompt only the sections you need; all other values carry forward from the existing conf
+- In all modes, existing conf values are loaded as defaults so prompts pre-populate with current settings
 
 ---
 

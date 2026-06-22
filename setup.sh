@@ -141,104 +141,201 @@ fi
 success "Example scripts found."
 
 # -----------------------------------------------------------------------------
-# Step 2 — Configuration
+# Default CFG_* values — overridden by existing conf or user input
 # -----------------------------------------------------------------------------
-info "Step 2/6 — Configuration"
-echo
-echo "  Press Enter to accept each default value shown in [brackets]."
-
-# Plex data directory
 CFG_PLEX_DATA="/var/lib/plexmediaserver/Library/Application Support/Plex Media Server"
-prompt CFG_PLEX_DATA \
-  "Plex data directory  " \
-  "${CFG_PLEX_DATA}"
-if [[ -d "${CFG_PLEX_DATA}" ]]; then
-  success "Directory exists."
-else
-  warn "Directory not found — verify the path before continuing."
-fi
-
-# Plex service name
 CFG_PLEX_SERVICE="plexmediaserver"
-prompt CFG_PLEX_SERVICE "Plex systemd service " "${CFG_PLEX_SERVICE}"
-if systemctl is-active --quiet "${CFG_PLEX_SERVICE}" 2>/dev/null || \
-   systemctl is-enabled --quiet "${CFG_PLEX_SERVICE}" 2>/dev/null; then
-  success "Service '${CFG_PLEX_SERVICE}' found."
-else
-  warn "Service '${CFG_PLEX_SERVICE}' not detected — verify with: systemctl list-units --type=service | grep -i plex"
-fi
-
-# NFS
 CFG_NFS_EXPORT=""
 CFG_NFS_MOUNT_POINT=""
 CFG_NFS_OPTS="vers=3,soft,rsize=131072,wsize=131072,timeo=600,retrans=2,_netdev"
 CFG_BACKUP_DEST=""
-
-echo
-if confirm "Is your backup destination on an NFS share?"; then
-  while [[ -z "${CFG_NFS_EXPORT}" ]]; do
-    prompt CFG_NFS_EXPORT      "NFS export         " "${CFG_NFS_EXPORT}"      "192.168.1.93:/volume1/Backups"
-    [[ -z "${CFG_NFS_EXPORT}" ]] && warn "NFS export is required."
-  done
-  while [[ -z "${CFG_NFS_MOUNT_POINT}" ]]; do
-    prompt CFG_NFS_MOUNT_POINT "NFS mount point    " "${CFG_NFS_MOUNT_POINT}" "/mnt/nfs/nas03/backups"
-    [[ -z "${CFG_NFS_MOUNT_POINT}" ]] && warn "NFS mount point is required."
-  done
-  prompt CFG_NFS_OPTS        "NFS mount options  " "${CFG_NFS_OPTS}"
-  CFG_BACKUP_DEST="${CFG_NFS_MOUNT_POINT}/Plex"
-  prompt CFG_BACKUP_DEST "Backup destination " "${CFG_BACKUP_DEST}"
-else
-  prompt CFG_BACKUP_DEST "Backup destination " "${CFG_BACKUP_DEST}" "/mnt/backups/Plex"
-fi
-[[ -z "${CFG_BACKUP_DEST}" ]] && error "Backup destination is required."
-
-# Logging
 CFG_LOG_DIR="/var/log/plex-backup"
 CFG_LOG_RETAIN_DAYS="7"
 CFG_WARN_AGE_HOURS="25"
-prompt CFG_LOG_DIR         "Log directory      " "${CFG_LOG_DIR}"
-prompt CFG_LOG_RETAIN_DAYS "Log retention days " "${CFG_LOG_RETAIN_DAYS}"
-prompt CFG_WARN_AGE_HOURS  "Backup age warning " "${CFG_WARN_AGE_HOURS}"
-
-# ntfy
 CFG_NTFY_TOPIC=""
 CFG_NTFY_URL="https://ntfy.sh"
 CFG_NTFY_ON_FAILURE="true"
 CFG_NTFY_ON_SUCCESS="false"
-
-echo
-if confirm "Configure ntfy alerting?"; then
-  prompt CFG_NTFY_TOPIC "ntfy topic         " "${CFG_NTFY_TOPIC}" "my-plex-backup"
-  prompt CFG_NTFY_URL   "ntfy server URL    " "${CFG_NTFY_URL}"
-  [[ -z "${CFG_NTFY_TOPIC}" ]] && error "ntfy topic is required when alerting is enabled."
-  echo
-  menu CFG_NTFY_ON_FAILURE 1 "Alert on failure (recommended)" "No failure alerts"
-  [[ "${CFG_NTFY_ON_FAILURE}" == "1" ]] && CFG_NTFY_ON_FAILURE="true" || CFG_NTFY_ON_FAILURE="false"
-  echo
-  menu CFG_NTFY_ON_SUCCESS 2 "Alert on success" "No success alerts (recommended)"
-  [[ "${CFG_NTFY_ON_SUCCESS}" == "1" ]] && CFG_NTFY_ON_SUCCESS="true" || CFG_NTFY_ON_SUCCESS="false"
-fi
-
-# Tautulli
 CFG_TAUTULLI_ENABLED="false"
 CFG_TAUTULLI_DATA="/opt/Tautulli"
 CFG_TAUTULLI_BACKUP_DEST=""
 
-echo
-if confirm "Back up Tautulli?"; then
-  CFG_TAUTULLI_ENABLED="true"
-  prompt CFG_TAUTULLI_DATA "Tautulli directory " "${CFG_TAUTULLI_DATA}"
-  if [[ -d "${CFG_TAUTULLI_DATA}" ]]; then
+# -----------------------------------------------------------------------------
+# Section functions — each prompts only its own variables
+# -----------------------------------------------------------------------------
+configure_plex() {
+  echo
+  echo "  Press Enter to accept each default value shown in [brackets]."
+  prompt CFG_PLEX_DATA    "Plex data directory  " "${CFG_PLEX_DATA}"
+  if [[ -d "${CFG_PLEX_DATA}" ]]; then
     success "Directory exists."
   else
     warn "Directory not found — verify the path before continuing."
   fi
-  if [[ -n "${CFG_NFS_MOUNT_POINT}" ]]; then
-    CFG_TAUTULLI_BACKUP_DEST="${CFG_NFS_MOUNT_POINT}/Tautulli"
+  prompt CFG_PLEX_SERVICE "Plex systemd service " "${CFG_PLEX_SERVICE}"
+  if systemctl is-active --quiet "${CFG_PLEX_SERVICE}" 2>/dev/null || \
+     systemctl is-enabled --quiet "${CFG_PLEX_SERVICE}" 2>/dev/null; then
+    success "Service '${CFG_PLEX_SERVICE}' found."
+  else
+    warn "Service '${CFG_PLEX_SERVICE}' not detected — verify with: systemctl list-units --type=service | grep -i plex"
   fi
-  prompt CFG_TAUTULLI_BACKUP_DEST "Tautulli backup    " "${CFG_TAUTULLI_BACKUP_DEST}" "/mnt/nfs/nas03/backups/Tautulli"
-  [[ -z "${CFG_TAUTULLI_BACKUP_DEST}" ]] && error "Tautulli backup destination is required."
+}
+
+configure_nfs() {
+  echo
+  if confirm "Is your backup destination on an NFS share?"; then
+    while [[ -z "${CFG_NFS_EXPORT}" ]]; do
+      prompt CFG_NFS_EXPORT      "NFS export         " "${CFG_NFS_EXPORT}"      "192.168.1.93:/volume1/Backups"
+      [[ -z "${CFG_NFS_EXPORT}" ]] && warn "NFS export is required."
+    done
+    while [[ -z "${CFG_NFS_MOUNT_POINT}" ]]; do
+      prompt CFG_NFS_MOUNT_POINT "NFS mount point    " "${CFG_NFS_MOUNT_POINT}" "/mnt/nfs/nas03/backups"
+      [[ -z "${CFG_NFS_MOUNT_POINT}" ]] && warn "NFS mount point is required."
+    done
+    prompt CFG_NFS_OPTS    "NFS mount options  " "${CFG_NFS_OPTS}"
+    local default_dest="${CFG_NFS_MOUNT_POINT}/Plex"
+    [[ -z "${CFG_BACKUP_DEST}" ]] && CFG_BACKUP_DEST="${default_dest}"
+    prompt CFG_BACKUP_DEST "Backup destination " "${CFG_BACKUP_DEST}"
+  else
+    CFG_NFS_EXPORT=""
+    CFG_NFS_MOUNT_POINT=""
+    prompt CFG_BACKUP_DEST "Backup destination " "${CFG_BACKUP_DEST}" "/mnt/backups/Plex"
+  fi
+  [[ -z "${CFG_BACKUP_DEST}" ]] && error "Backup destination is required."
+}
+
+configure_logging() {
+  echo
+  prompt CFG_LOG_DIR         "Log directory      " "${CFG_LOG_DIR}"
+  prompt CFG_LOG_RETAIN_DAYS "Log retention days " "${CFG_LOG_RETAIN_DAYS}"
+  prompt CFG_WARN_AGE_HOURS  "Backup age warning " "${CFG_WARN_AGE_HOURS}"
+}
+
+configure_ntfy() {
+  echo
+  if confirm "Configure ntfy alerting?"; then
+    prompt CFG_NTFY_TOPIC "ntfy topic         " "${CFG_NTFY_TOPIC}" "my-plex-backup"
+    prompt CFG_NTFY_URL   "ntfy server URL    " "${CFG_NTFY_URL}"
+    [[ -z "${CFG_NTFY_TOPIC}" ]] && error "ntfy topic is required when alerting is enabled."
+    echo
+    menu CFG_NTFY_ON_FAILURE 1 "Alert on failure (recommended)" "No failure alerts"
+    [[ "${CFG_NTFY_ON_FAILURE}" == "1" ]] && CFG_NTFY_ON_FAILURE="true" || CFG_NTFY_ON_FAILURE="false"
+    echo
+    menu CFG_NTFY_ON_SUCCESS 2 "Alert on success" "No success alerts (recommended)"
+    [[ "${CFG_NTFY_ON_SUCCESS}" == "1" ]] && CFG_NTFY_ON_SUCCESS="true" || CFG_NTFY_ON_SUCCESS="false"
+  else
+    CFG_NTFY_TOPIC=""
+  fi
+}
+
+configure_tautulli() {
+  echo
+  if confirm "Back up Tautulli?"; then
+    CFG_TAUTULLI_ENABLED="true"
+    prompt CFG_TAUTULLI_DATA "Tautulli directory " "${CFG_TAUTULLI_DATA}"
+    if [[ -d "${CFG_TAUTULLI_DATA}" ]]; then
+      success "Directory exists."
+    else
+      warn "Directory not found — verify the path before continuing."
+    fi
+    if [[ -n "${CFG_NFS_MOUNT_POINT}" && -z "${CFG_TAUTULLI_BACKUP_DEST}" ]]; then
+      CFG_TAUTULLI_BACKUP_DEST="${CFG_NFS_MOUNT_POINT}/Tautulli"
+    fi
+    prompt CFG_TAUTULLI_BACKUP_DEST "Tautulli backup    " "${CFG_TAUTULLI_BACKUP_DEST}" "/mnt/nfs/nas03/backups/Tautulli"
+    [[ -z "${CFG_TAUTULLI_BACKUP_DEST}" ]] && error "Tautulli backup destination is required."
+  else
+    CFG_TAUTULLI_ENABLED="false"
+  fi
+}
+
+# -----------------------------------------------------------------------------
+# Step 2 — Configuration
+# -----------------------------------------------------------------------------
+info "Step 2/6 — Configuration"
+
+SETUP_MODE="full"
+
+if [[ -f "${CONF_FILE}" ]]; then
+  echo
+  echo "  Existing configuration found at ${CONF_FILE}"
+  echo
+  echo "    1) Reinstall scripts as-is (skip configuration)"
+  echo "    2) Update a section"
+  echo "    3) Full reconfigure"
+  echo
+  echo -en "  Choice [1]: "
+  read -r MODE_CHOICE
+  [[ -z "${MODE_CHOICE}" ]] && MODE_CHOICE="1"
+
+  # Source existing conf into CFG_* variables
+  # shellcheck source=/dev/null
+  source "${CONF_FILE}"
+  CFG_PLEX_DATA="${PLEX_DATA:-${CFG_PLEX_DATA}}"
+  CFG_PLEX_SERVICE="${PLEX_SERVICE:-${CFG_PLEX_SERVICE}}"
+  CFG_NFS_EXPORT="${NFS_EXPORT:-${CFG_NFS_EXPORT}}"
+  CFG_NFS_MOUNT_POINT="${NFS_MOUNT_POINT:-${CFG_NFS_MOUNT_POINT}}"
+  CFG_NFS_OPTS="${NFS_OPTS:-${CFG_NFS_OPTS}}"
+  CFG_BACKUP_DEST="${BACKUP_DEST:-${CFG_BACKUP_DEST}}"
+  CFG_LOG_DIR="${LOG_DIR:-${CFG_LOG_DIR}}"
+  CFG_LOG_RETAIN_DAYS="${LOG_RETAIN_DAYS:-${CFG_LOG_RETAIN_DAYS}}"
+  CFG_WARN_AGE_HOURS="${WARN_AGE_HOURS:-${CFG_WARN_AGE_HOURS}}"
+  CFG_NTFY_TOPIC="${NTFY_TOPIC:-${CFG_NTFY_TOPIC}}"
+  CFG_NTFY_URL="${NTFY_URL:-${CFG_NTFY_URL}}"
+  CFG_NTFY_ON_FAILURE="${NTFY_ON_FAILURE:-${CFG_NTFY_ON_FAILURE}}"
+  CFG_NTFY_ON_SUCCESS="${NTFY_ON_SUCCESS:-${CFG_NTFY_ON_SUCCESS}}"
+  CFG_TAUTULLI_ENABLED="${TAUTULLI_ENABLED:-${CFG_TAUTULLI_ENABLED}}"
+  CFG_TAUTULLI_DATA="${TAUTULLI_DATA:-${CFG_TAUTULLI_DATA}}"
+  CFG_TAUTULLI_BACKUP_DEST="${TAUTULLI_BACKUP_DEST:-${CFG_TAUTULLI_BACKUP_DEST}}"
+
+  case "${MODE_CHOICE}" in
+    1) SETUP_MODE="reinstall" ;;
+    2) SETUP_MODE="update" ;;
+    3) SETUP_MODE="full" ;;
+    *) warn "Invalid choice — defaulting to reinstall." ; SETUP_MODE="reinstall" ;;
+  esac
 fi
+
+case "${SETUP_MODE}" in
+  reinstall)
+    echo
+    echo "  Skipping configuration — using existing settings."
+    ;;
+  update)
+    echo
+    echo "  Select sections to update."
+    echo "  Enter numbers separated by spaces, then Enter."
+    echo
+    echo "    1) Plex settings"
+    echo "    2) NFS / backup destination"
+    echo "    3) Logging"
+    echo "    4) ntfy alerting"
+    echo "    5) Tautulli"
+    echo
+    echo -en "  Sections to update: "
+    read -r SECTION_INPUT
+    if ! [[ "${SECTION_INPUT}" =~ ^[1-5\ ]+$ ]]; then
+      warn "Invalid input — no sections updated."
+      SECTION_INPUT=""
+    fi
+    echo
+    for sec in ${SECTION_INPUT}; do
+      case "${sec}" in
+        1) echo "  — Plex settings" ;             configure_plex ;;
+        2) echo "  — NFS / backup destination" ;  configure_nfs ;;
+        3) echo "  — Logging" ;                   configure_logging ;;
+        4) echo "  — ntfy alerting" ;             configure_ntfy ;;
+        5) echo "  — Tautulli" ;                  configure_tautulli ;;
+      esac
+    done
+    ;;
+  full)
+    configure_plex
+    configure_nfs
+    configure_logging
+    configure_ntfy
+    configure_tautulli
+    ;;
+esac
 
 # -----------------------------------------------------------------------------
 # Step 3 — NFS mount setup
