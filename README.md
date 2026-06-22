@@ -30,6 +30,7 @@ A minimal bash solution to back up Plex Media Server configuration and databases
 | Plug-in Support/Preferences/ | Per-plugin settings |
 | Preferences.xml | Main Plex configuration file |
 | Codecs/, Scanners/, Plug-ins/ | Regeneratable but included for completeness |
+| Tautulli data | Optional — `tautulli.db`, `config.ini`, `config.bak`, `data/` — enabled via `TAUTULLI_ENABLED=true` |
 
 **Not backed up:** Cache, Caches, Crash Reports, Logs, Plug-in Support/Caches, and media files.
 
@@ -92,7 +93,7 @@ The wizard will:
 5. Install scripts to `/usr/local/bin/` (or a path of your choosing)
 6. Write cron entries to root's crontab
 
-setup.sh is safe to re-run at any time to reconfigure or reinstall.
+setup.sh is safe to re-run at any time. When re-running on an existing installation, it detects the existing conf and offers three options: reinstall scripts as-is (no prompts), update a specific section, or full reconfigure.
 
 ---
 
@@ -151,6 +152,7 @@ Adjust the UTC hour to match your preferred local time.
 - **Backup age** — warns if the backup is older than `WARN_AGE_HOURS` (catches missed cron runs)
 - **Required files** — confirms critical databases and Preferences.xml are present and reports their size
 - **Total backup size** — gross sanity check
+- **Tautulli backup** — confirms `tautulli.db` and `config.ini` are present and reports total size (if `TAUTULLI_ENABLED=true`)
 
 To run manually:
 
