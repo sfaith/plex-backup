@@ -14,6 +14,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
 ---
 
+## [0.3.5] - 2026-06-21
+
+### Changed
+- setup.sh completion screen now distinguishes the initial backup command from the manual validation command, and notes that the first backup may take several hours
+
+---
+
 ## [0.3.4] - 2026-06-21
 
 ### Changed

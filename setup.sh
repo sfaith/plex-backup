@@ -590,8 +590,11 @@ echo "             ${INSTALL_VALIDATE}"
 echo "  Logs:      ${CFG_LOG_DIR}/"
 echo "  Setup log: ${LOG_FILE}"
 echo
-echo "  To run manually:"
+echo "  To run an initial backup (first run may take several hours):"
 echo "    sudo ${INSTALL_BACKUP}"
+echo
+echo "  Validation runs automatically at the end of each backup."
+echo "  To validate manually:"
 echo "    sudo ${INSTALL_VALIDATE}"
 echo
 success "Done."
