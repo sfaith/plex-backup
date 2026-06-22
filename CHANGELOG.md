@@ -11,6 +11,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
 ### Planned
 - plex-restore.sh — restore from NAS backup with ownership fix
+- setup.sh — detect existing conf and offer reuse/selective update instead of reprompting everything
+
+---
+
+## [0.3.1] - 2026-06-21
+
+### Changed
+- plex-backup.sh now waits up to 30 seconds for Plex to confirm active after restart, mirroring stop logic; logs `plexmediaserver started after Xs` on success or exits non-zero with an ntfy alert if it fails to come up
 
 ---
 

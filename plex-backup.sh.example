@@ -88,6 +88,20 @@ if ! systemctl start "${PLEX_SERVICE}"; then
     exit 1
 fi
 
+START_WAIT=0
+while ! systemctl is-active --quiet "${PLEX_SERVICE}" && [ ${START_WAIT} -lt 30 ]; do
+    sleep 1
+    START_WAIT=$(( START_WAIT + 1 ))
+done
+
+if ! systemctl is-active --quiet "${PLEX_SERVICE}"; then
+    echo "[$(date)] ERROR: ${PLEX_SERVICE} did not start within 30 seconds"
+    [ "${NTFY_ON_FAILURE}" = "true" ] && ntfy_send "Plex Backup WARNING" "Backup complete but Plex failed to restart — check server" "high"
+    exit 1
+fi
+
+echo "[$(date)] ${PLEX_SERVICE} started after ${START_WAIT}s"
+
 # --- Check rsync result ---
 if [ ${RSYNC_EXIT} -ne 0 ]; then
     echo "[$(date)] ERROR: rsync exited with code ${RSYNC_EXIT}"
