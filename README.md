@@ -1,6 +1,6 @@
 # plex-backup
 
-![Version](https://img.shields.io/badge/version-0.3.3-blue) ![Platform](https://img.shields.io/badge/platform-Linux-lightgrey) ![Shell](https://img.shields.io/badge/shell-bash-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-green)
+![Version](https://img.shields.io/badge/version-0.3.4-blue) ![Platform](https://img.shields.io/badge/platform-Linux-lightgrey) ![Shell](https://img.shields.io/badge/shell-bash-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-green)
 
 A minimal bash solution to back up Plex Media Server configuration and databases to a NAS. No media files — just the data that's hard to replace.
 

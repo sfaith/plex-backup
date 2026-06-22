@@ -480,23 +480,34 @@ success "Config written to ${CONF_FILE}"
 info "Step 5/6 — Script installation"
 
 CFG_INSTALL_PATH="/usr/local/bin"
-prompt CFG_INSTALL_PATH "Install path       " "${CFG_INSTALL_PATH}"
 
-INSTALL_BACKUP="${CFG_INSTALL_PATH}/plex-backup.sh"
-INSTALL_VALIDATE="${CFG_INSTALL_PATH}/plex-backup-validate.sh"
+if [[ "${SETUP_MODE}" == "reinstall" ]]; then
+  INSTALL_BACKUP="${CFG_INSTALL_PATH}/plex-backup.sh"
+  INSTALL_VALIDATE="${CFG_INSTALL_PATH}/plex-backup-validate.sh"
+  cp "${BACKUP_EXAMPLE}"   "${INSTALL_BACKUP}"
+  cp "${VALIDATE_EXAMPLE}" "${INSTALL_VALIDATE}"
+  chmod 700 "${INSTALL_BACKUP}" "${INSTALL_VALIDATE}"
+  chown root:root "${INSTALL_BACKUP}" "${INSTALL_VALIDATE}"
+  success "Scripts reinstalled to ${CFG_INSTALL_PATH}."
+else
+  prompt CFG_INSTALL_PATH "Install path       " "${CFG_INSTALL_PATH}"
 
-for target in "${INSTALL_BACKUP}" "${INSTALL_VALIDATE}"; do
-  if [[ -f "${target}" ]]; then
-    warn "Existing script found: ${target}"
-    confirm "Overwrite?" || error "Aborting — remove existing scripts or choose a different install path."
-  fi
-done
+  INSTALL_BACKUP="${CFG_INSTALL_PATH}/plex-backup.sh"
+  INSTALL_VALIDATE="${CFG_INSTALL_PATH}/plex-backup-validate.sh"
 
-cp "${BACKUP_EXAMPLE}"   "${INSTALL_BACKUP}"
-cp "${VALIDATE_EXAMPLE}" "${INSTALL_VALIDATE}"
-chmod 700 "${INSTALL_BACKUP}" "${INSTALL_VALIDATE}"
-chown root:root "${INSTALL_BACKUP}" "${INSTALL_VALIDATE}"
-success "Scripts installed to ${CFG_INSTALL_PATH}."
+  for target in "${INSTALL_BACKUP}" "${INSTALL_VALIDATE}"; do
+    if [[ -f "${target}" ]]; then
+      warn "Existing script found: ${target}"
+      confirm "Overwrite?" || error "Aborting — remove existing scripts or choose a different install path."
+    fi
+  done
+
+  cp "${BACKUP_EXAMPLE}"   "${INSTALL_BACKUP}"
+  cp "${VALIDATE_EXAMPLE}" "${INSTALL_VALIDATE}"
+  chmod 700 "${INSTALL_BACKUP}" "${INSTALL_VALIDATE}"
+  chown root:root "${INSTALL_BACKUP}" "${INSTALL_VALIDATE}"
+  success "Scripts installed to ${CFG_INSTALL_PATH}."
+fi
 
 # -----------------------------------------------------------------------------
 # Step 6 — Cron setup

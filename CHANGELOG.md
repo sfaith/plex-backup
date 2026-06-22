@@ -14,6 +14,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
 ---
 
+## [0.3.4] - 2026-06-21
+
+### Changed
+- setup.sh reinstall mode now skips the install path prompt and overwrite confirmations — scripts are replaced silently with a single [OK] line
+
+---
+
 ## [0.3.3] - 2026-06-21
 
 ### Changed
