@@ -71,6 +71,7 @@ Plex is restarted even if rsync fails, so a bad backup run never leaves Plex off
 | git | `apt install git` — required to clone the repo |
 | rsync | `apt install rsync` — setup.sh will offer to install |
 | curl | Required for ntfy alerting — setup.sh will offer to install |
+| nfs-common | Required for NFS mounts (`apt install nfs-common`) — setup.sh will offer to install if you choose NFS |
 | A backup destination | NFS mount, SMB mount, or local path |
 
 ---

@@ -19,7 +19,7 @@ PLEX_SERVICE="plexmediaserver"
 # =============================================================================
 
 # Full path where Plex data will be backed up (NFS mount subdirectory or local path)
-BACKUP_DEST="/mnt/nfs/your-nas/backups/Plex"
+BACKUP_DEST="/mnt/nfs/YOUR_NAS_IP_OR_HOSTNAME/backups/Plex"
 
 # =============================================================================
 # NFS mount (optional)
@@ -69,4 +69,4 @@ TAUTULLI_ENABLED=false
 TAUTULLI_DATA="/opt/Tautulli"
 
 # Full path where Tautulli data will be backed up
-TAUTULLI_BACKUP_DEST="/mnt/nfs/your-nas/backups/Tautulli"
+TAUTULLI_BACKUP_DEST="/mnt/nfs/YOUR_NAS_IP_OR_HOSTNAME/backups/Tautulli"

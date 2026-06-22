@@ -184,6 +184,18 @@ configure_plex() {
 configure_nfs() {
   echo
   if confirm "Is your backup destination on an NFS share?"; then
+    if ! command -v mount.nfs &>/dev/null; then
+      warn "mount.nfs not found — NFS support requires the nfs-common package."
+      if confirm "Attempt to install nfs-common with apt?"; then
+        apt-get update -qq
+        apt-get install -y nfs-common
+        success "nfs-common installed."
+      else
+        error "nfs-common is required for NFS mounts. Install it and re-run setup.sh."
+      fi
+    else
+      success "mount.nfs found."
+    fi
     while [[ -z "${CFG_NFS_EXPORT}" ]]; do
       prompt CFG_NFS_EXPORT      "NFS export         " "${CFG_NFS_EXPORT}"      "192.168.1.93:/volume1/Backups"
       [[ -z "${CFG_NFS_EXPORT}" ]] && warn "NFS export is required."
@@ -524,6 +536,18 @@ echo "  No separate validation cron entry is needed."
 echo
 
 CFG_CRON_UTC="10:00"
+
+# Carry forward existing cron time if a plex-backup entry already exists
+EXISTING_CRON_CHECK=$(crontab -u root -l 2>/dev/null || true)
+if echo "${EXISTING_CRON_CHECK}" | grep -q "plex-backup"; then
+  EXISTING_ENTRY=$(echo "${EXISTING_CRON_CHECK}" | grep "plex-backup" | head -1)
+  EXISTING_M=$(echo "${EXISTING_ENTRY}" | awk '{print $1}')
+  EXISTING_H=$(echo "${EXISTING_ENTRY}" | awk '{print $2}')
+  if [[ "${EXISTING_H}" =~ ^[0-9]+$ && "${EXISTING_M}" =~ ^[0-9]+$ ]]; then
+    CFG_CRON_UTC=$(printf "%02d:%02d" "${EXISTING_H}" "${EXISTING_M}")
+  fi
+fi
+
 prompt CFG_CRON_UTC "Backup time (UTC)  " "${CFG_CRON_UTC}"
 if ! [[ "${CFG_CRON_UTC}" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]]; then
   warn "Invalid time format — defaulting to 10:00."

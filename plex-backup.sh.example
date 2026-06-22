@@ -129,7 +129,7 @@ if [ "${TAUTULLI_ENABLED:-false}" = "true" ]; then
     TAUTULLI_RSYNC_EXIT=$?
     if [ ${TAUTULLI_RSYNC_EXIT} -ne 0 ]; then
         echo "[$(date)] ERROR: Tautulli rsync exited with code ${TAUTULLI_RSYNC_EXIT}"
-        [ "${NTFY_ON_FAILURE}" = "true" ] && ntfy_send "Plex Backup FAILED" "Tautulli rsync error (code ${TAUTULLI_RSYNC_EXIT}) — check ${LOG_DIR}" "high"
+        [ "${NTFY_ON_FAILURE}" = "true" ] && ntfy_send "Tautulli Backup FAILED" "Tautulli rsync error (code ${TAUTULLI_RSYNC_EXIT}) — check ${LOG_DIR}" "high"
         exit ${TAUTULLI_RSYNC_EXIT}
     fi
     echo "[$(date)] Tautulli backup complete"
