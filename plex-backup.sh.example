@@ -77,6 +77,7 @@ rsync -aH --delete \
     --exclude="Crash Reports/" \
     --exclude="Logs/" \
     --exclude="Plug-in Support/Caches/" \
+    --exclude="Plug-in Support/Databases/dbtmp/" \
     "${PLEX_DATA}/" "${BACKUP_DEST}/"
 RSYNC_EXIT=$?
 

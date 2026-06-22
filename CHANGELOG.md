@@ -14,6 +14,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
 ---
 
+## [0.3.6] - 2026-06-21
+
+### Changed
+- plex-backup.sh now excludes `Plug-in Support/Databases/dbtmp/` from rsync — this directory is used by Plex for temporary DB repair and export files and should never be backed up
+
+---
+
 ## [0.3.5] - 2026-06-21
 
 ### Changed

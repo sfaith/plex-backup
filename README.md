@@ -1,6 +1,6 @@
 # plex-backup
 
-![Version](https://img.shields.io/badge/version-0.3.5-blue) ![Platform](https://img.shields.io/badge/platform-Linux-lightgrey) ![Shell](https://img.shields.io/badge/shell-bash-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-green)
+![Version](https://img.shields.io/badge/version-0.3.6-blue) ![Platform](https://img.shields.io/badge/platform-Linux-lightgrey) ![Shell](https://img.shields.io/badge/shell-bash-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-green)
 
 A minimal bash solution to back up Plex Media Server configuration and databases to a NAS. No media files — just the data that's hard to replace.
 
@@ -32,7 +32,7 @@ A minimal bash solution to back up Plex Media Server configuration and databases
 | Codecs/, Scanners/, Plug-ins/ | Regeneratable but included for completeness |
 | Tautulli data | Optional — `tautulli.db`, `config.ini`, `config.bak`, `data/` — enabled via `TAUTULLI_ENABLED=true` |
 
-**Not backed up:** Cache, Caches, Crash Reports, Logs, Plug-in Support/Caches, and media files.
+**Not backed up:** Cache, Caches, Crash Reports, Logs, Plug-in Support/Caches, Plug-in Support/Databases/dbtmp, and media files.
 
 ---
 
