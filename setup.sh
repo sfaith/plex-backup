@@ -219,6 +219,27 @@ if confirm "Configure ntfy alerting?"; then
   [[ "${CFG_NTFY_ON_SUCCESS}" == "1" ]] && CFG_NTFY_ON_SUCCESS="true" || CFG_NTFY_ON_SUCCESS="false"
 fi
 
+# Tautulli
+CFG_TAUTULLI_ENABLED="false"
+CFG_TAUTULLI_DATA="/opt/Tautulli"
+CFG_TAUTULLI_BACKUP_DEST=""
+
+echo
+if confirm "Back up Tautulli?"; then
+  CFG_TAUTULLI_ENABLED="true"
+  prompt CFG_TAUTULLI_DATA "Tautulli directory " "${CFG_TAUTULLI_DATA}"
+  if [[ -d "${CFG_TAUTULLI_DATA}" ]]; then
+    success "Directory exists."
+  else
+    warn "Directory not found — verify the path before continuing."
+  fi
+  if [[ -n "${CFG_NFS_MOUNT_POINT}" ]]; then
+    CFG_TAUTULLI_BACKUP_DEST="${CFG_NFS_MOUNT_POINT}/Tautulli"
+  fi
+  prompt CFG_TAUTULLI_BACKUP_DEST "Tautulli backup    " "${CFG_TAUTULLI_BACKUP_DEST}" "/mnt/nfs/nas03/backups/Tautulli"
+  [[ -z "${CFG_TAUTULLI_BACKUP_DEST}" ]] && error "Tautulli backup destination is required."
+fi
+
 # -----------------------------------------------------------------------------
 # Step 3 — NFS mount setup
 # -----------------------------------------------------------------------------
@@ -278,6 +299,18 @@ if [[ -n "${CFG_NFS_EXPORT}" ]]; then
   else
     success "Backup destination already exists: ${CFG_BACKUP_DEST}"
   fi
+
+  # Create Tautulli backup subdirectory if enabled
+  if [[ "${CFG_TAUTULLI_ENABLED}" == "true" && -n "${CFG_TAUTULLI_BACKUP_DEST}" ]]; then
+    if [[ ! -d "${CFG_TAUTULLI_BACKUP_DEST}" ]]; then
+      if confirm "Create Tautulli backup destination ${CFG_TAUTULLI_BACKUP_DEST}?"; then
+        mkdir -p "${CFG_TAUTULLI_BACKUP_DEST}"
+        success "Tautulli backup destination created."
+      fi
+    else
+      success "Tautulli backup destination already exists: ${CFG_TAUTULLI_BACKUP_DEST}"
+    fi
+  fi
 else
   info "NFS not configured — skipping."
 fi
@@ -331,6 +364,13 @@ NTFY_TOPIC="${CFG_NTFY_TOPIC}"
 NTFY_URL="${CFG_NTFY_URL}"
 NTFY_ON_FAILURE=${CFG_NTFY_ON_FAILURE}
 NTFY_ON_SUCCESS=${CFG_NTFY_ON_SUCCESS}
+
+# =============================================================================
+# Tautulli
+# =============================================================================
+TAUTULLI_ENABLED=${CFG_TAUTULLI_ENABLED}
+TAUTULLI_DATA="${CFG_TAUTULLI_DATA}"
+TAUTULLI_BACKUP_DEST="${CFG_TAUTULLI_BACKUP_DEST}"
 EOF
 
 chmod 600 "${CONF_FILE}"
@@ -371,6 +411,9 @@ echo "  Cron entries run as root (scripts require systemctl stop/start)."
 echo "  Enter your desired backup time in UTC."
 echo "  Example: 3:00 AM MST (UTC-7) = 10:00 UTC."
 echo
+echo "  Note: Validation runs automatically at the end of each backup run."
+echo "  No separate validation cron entry is needed."
+echo
 
 CFG_CRON_UTC="10:00"
 prompt CFG_CRON_UTC "Backup time (UTC)  " "${CFG_CRON_UTC}"
@@ -380,14 +423,13 @@ if ! [[ "${CFG_CRON_UTC}" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]]; then
 fi
 
 CRON_H="${CFG_CRON_UTC%%:*}"
-CRON_BACKUP="0 ${CRON_H} * * * /bin/bash ${INSTALL_BACKUP}"
-CRON_VALIDATE="30 ${CRON_H} * * * /bin/bash ${INSTALL_VALIDATE}"
+CRON_M="${CFG_CRON_UTC##*:}"
+CRON_BACKUP="${CRON_M} ${CRON_H} * * * /bin/bash ${INSTALL_BACKUP}"
 
 echo
-echo "  The following cron entries will be written for root:"
+echo "  The following cron entry will be written for root:"
 echo
 echo "    ${CRON_BACKUP}"
-echo "    ${CRON_VALIDATE}"
 echo
 
 SKIP_CRON=false
@@ -401,16 +443,15 @@ if echo "${EXISTING_CRON}" | grep -q "plex-backup"; then
 fi
 
 if [[ "${SKIP_CRON}" == "false" ]]; then
-  if confirm "Write these cron entries?"; then
+  if confirm "Write this cron entry?"; then
     CLEAN_CRON=$(echo "${EXISTING_CRON}" | grep -v "plex-backup" || true)
     {
       [[ -n "${CLEAN_CRON}" ]] && echo "${CLEAN_CRON}"
       echo "${CRON_BACKUP}"
-      echo "${CRON_VALIDATE}"
     } | crontab -u root -
-    success "Cron entries written."
+    success "Cron entry written."
   else
-    warn "Skipping cron — add entries manually with: crontab -e"
+    warn "Skipping cron — add entry manually with: crontab -e"
   fi
 fi
 

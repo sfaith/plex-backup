@@ -80,6 +80,9 @@ if ! mountpoint -q "$(dirname "${BACKUP_DEST}")"; then
 fi
 
 # --- Validate date argument if provided ---
+# Note: The date argument is reserved for future snapshot/dated-copy support.
+# Current backup strategy is a single rolling copy; passing a date will look
+# for a subdirectory that does not exist under normal operation.
 if [ -n "${1:-}" ]; then
     if ! echo "$1" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
         echo "[$(date)] ERROR: Invalid date format '$1' — expected YYYY-MM-DD"
@@ -129,7 +132,35 @@ done
 
 # --- Backup size ---
 TOTAL_SIZE=$(du -sh "${SNAPSHOT}" 2>/dev/null | cut -f1)
-echo "[$(date)] Total backup size: ${TOTAL_SIZE}"
+echo "[$(date)] Total Plex backup size: ${TOTAL_SIZE}"
+
+# --- Tautulli validation (optional) ---
+if [ "${TAUTULLI_ENABLED:-false}" = "true" ]; then
+    echo "[$(date)] Validating Tautulli backup at ${TAUTULLI_BACKUP_DEST}"
+
+    if [ ! -d "${TAUTULLI_BACKUP_DEST}" ]; then
+        echo "[$(date)] ERROR: Tautulli backup destination not found: ${TAUTULLI_BACKUP_DEST}"
+        EXIT_CODE=1
+    else
+        TAUTULLI_REQUIRED_FILES=(
+            "tautulli.db"
+            "config.ini"
+        )
+
+        for f in "${TAUTULLI_REQUIRED_FILES[@]}"; do
+            if [ ! -f "${TAUTULLI_BACKUP_DEST}/${f}" ]; then
+                echo "[$(date)] ERROR: Missing Tautulli file: ${f}"
+                EXIT_CODE=1
+            else
+                SIZE=$(du -sh "${TAUTULLI_BACKUP_DEST}/${f}" 2>/dev/null | cut -f1)
+                echo "[$(date)] OK: ${f} (${SIZE})"
+            fi
+        done
+
+        TAUTULLI_SIZE=$(du -sh "${TAUTULLI_BACKUP_DEST}" 2>/dev/null | cut -f1)
+        echo "[$(date)] Total Tautulli backup size: ${TAUTULLI_SIZE}"
+    fi
+fi
 
 # --- Final result ---
 if [ ${EXIT_CODE} -eq 0 ]; then

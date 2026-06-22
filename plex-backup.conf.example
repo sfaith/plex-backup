@@ -57,3 +57,16 @@ NTFY_TOPIC=""
 NTFY_URL="https://ntfy.sh"
 NTFY_ON_FAILURE=true
 NTFY_ON_SUCCESS=false
+
+# =============================================================================
+# Tautulli
+# =============================================================================
+
+# Set to true to enable Tautulli backup and validation
+TAUTULLI_ENABLED=false
+
+# Full path to Tautulli installation directory
+TAUTULLI_DATA="/opt/Tautulli"
+
+# Full path where Tautulli data will be backed up
+TAUTULLI_BACKUP_DEST="/mnt/nfs/your-nas/backups/Tautulli"

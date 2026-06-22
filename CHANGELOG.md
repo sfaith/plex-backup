@@ -11,7 +11,20 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
 ### Planned
 - plex-restore.sh — restore from NAS backup with ownership fix
-- Tautulli backup support (optional, toggled via TAUTULLI_ENABLED)
+
+---
+
+## [0.3.0] - 2026-06-21
+
+### Added
+- Tautulli backup support — optional, enabled via `TAUTULLI_ENABLED=true` in conf; backs up `tautulli.db`, `config.ini`, `config.bak`, and `data/` to a configurable destination
+- Tautulli validation in plex-backup-validate.sh — checks required files and reports total size when `TAUTULLI_ENABLED=true`
+- Tautulli configuration prompts in setup.sh — wizard creates backup destination directory and updates conf automatically
+
+### Changed
+- plex-backup.sh now calls plex-backup-validate.sh automatically at the end of a successful run — no separate cron entry needed
+- plex-backup.sh now exits non-zero if Plex fails to restart after backup
+- setup.sh cron step writes a single backup entry and removes any existing standalone validate cron entry
 
 ---
 

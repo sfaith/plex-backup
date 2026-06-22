@@ -1,6 +1,6 @@
 # plex-backup
 
-![Version](https://img.shields.io/badge/version-0.2.0-blue) ![Platform](https://img.shields.io/badge/platform-Linux-lightgrey) ![Shell](https://img.shields.io/badge/shell-bash-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-green)
+![Version](https://img.shields.io/badge/version-0.3.0-blue) ![Platform](https://img.shields.io/badge/platform-Linux-lightgrey) ![Shell](https://img.shields.io/badge/shell-bash-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-green)
 
 A minimal bash solution to back up Plex Media Server configuration and databases to a NAS. No media files — just the data that's hard to replace.
 
@@ -42,15 +42,18 @@ A minimal bash solution to back up Plex Media Server configuration and databases
 2. Stops Plex Media Server
 3. Runs rsync to the backup destination (single rolling copy — previous backup is overwritten)
 4. Restarts Plex Media Server regardless of rsync result
-5. Sends ntfy alert on failure or success (if configured)
-6. Logs the run and prunes old logs
+5. Backs up Tautulli data (if `TAUTULLI_ENABLED=true`)
+6. Runs plex-backup-validate.sh automatically
+7. Sends ntfy alert on failure or success (if configured)
+8. Logs the run and prunes old logs
 
-**plex-backup-validate.sh** (run separately, zero Plex downtime):
+**plex-backup-validate.sh** (called automatically by plex-backup.sh; also independently runnable, zero Plex downtime):
 1. Checks that the backup destination is mounted and reachable
 2. Verifies the backup is not older than the configured threshold
 3. Confirms all critical files are present and reports their size
 4. Reports total backup size
-5. Sends ntfy alert on pass or failure (if configured)
+5. Validates Tautulli backup files and size (if `TAUTULLI_ENABLED=true`)
+6. Sends ntfy alert on pass or failure (if configured)
 
 Plex is restarted even if rsync fails, so a bad backup run never leaves Plex offline.
 
@@ -116,6 +119,9 @@ sudo nano /etc/plex-backup/plex-backup.conf
 | `NTFY_URL` | ntfy server URL | `https://ntfy.sh` |
 | `NTFY_ON_FAILURE` | Send alert on backup failure | `true` |
 | `NTFY_ON_SUCCESS` | Send alert on backup success | `false` |
+| `TAUTULLI_ENABLED` | Enable Tautulli backup and validation | `false` |
+| `TAUTULLI_DATA` | Path to Tautulli installation directory | `/opt/Tautulli` |
+| `TAUTULLI_BACKUP_DEST` | Destination path for Tautulli backup | *(set by setup.sh)* |
 
 ---
 
@@ -127,11 +133,10 @@ setup.sh writes cron entries to root's crontab automatically. To review or modif
 sudo crontab -e
 ```
 
-The default schedule runs the backup at 10:00 UTC (3:00 AM MST) with validation 30 minutes later:
+The default schedule runs the backup at 10:00 UTC (3:00 AM MST). Validation runs automatically at the end of each backup — no separate cron entry is needed:
 
 ```
 0 10 * * * /bin/bash /usr/local/bin/plex-backup.sh
-30 10 * * * /bin/bash /usr/local/bin/plex-backup-validate.sh
 ```
 
 Adjust the UTC hour to match your preferred local time.
@@ -140,7 +145,7 @@ Adjust the UTC hour to match your preferred local time.
 
 ## Validation
 
-`plex-backup-validate.sh` runs entirely against the NAS copy — Plex is never touched. It checks:
+`plex-backup-validate.sh` is called automatically at the end of each backup run. It can also be run independently at any time — Plex is never touched. It checks:
 
 - **NFS mount** — aborts if the backup destination is unreachable
 - **Backup age** — warns if the backup is older than `WARN_AGE_HOURS` (catches missed cron runs)
@@ -191,4 +196,3 @@ tail -20 /var/log/plex-backup/plex-validate-$(date +%Y-%m-%d).log
 ## Planned
 
 - `plex-restore.sh` — restore from NAS backup, fix file ownership, restart Plex
-- Tautulli backup support — optional, toggled via `TAUTULLI_ENABLED`

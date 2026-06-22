@@ -85,6 +85,7 @@ echo "[$(date)] Starting ${PLEX_SERVICE}"
 if ! systemctl start "${PLEX_SERVICE}"; then
     echo "[$(date)] ERROR: Failed to start ${PLEX_SERVICE}"
     [ "${NTFY_ON_FAILURE}" = "true" ] && ntfy_send "Plex Backup WARNING" "Backup complete but Plex failed to restart — check server" "high"
+    exit 1
 fi
 
 # --- Check rsync result ---
@@ -94,7 +95,40 @@ if [ ${RSYNC_EXIT} -ne 0 ]; then
     exit ${RSYNC_EXIT}
 fi
 
-echo "[$(date)] Backup complete"
+echo "[$(date)] Plex backup complete"
+
+# --- Tautulli backup (optional) ---
+if [ "${TAUTULLI_ENABLED:-false}" = "true" ]; then
+    echo "[$(date)] Starting Tautulli backup to ${TAUTULLI_BACKUP_DEST}"
+    mkdir -p "${TAUTULLI_BACKUP_DEST}"
+    rsync -aH --delete \
+        --no-owner --no-group --no-perms \
+        --timeout=300 \
+        --include="tautulli.db" \
+        --include="config.ini" \
+        --include="config.bak" \
+        --include="data/" \
+        --include="data/**" \
+        --exclude="*" \
+        "${TAUTULLI_DATA}/" "${TAUTULLI_BACKUP_DEST}/"
+    TAUTULLI_RSYNC_EXIT=$?
+    if [ ${TAUTULLI_RSYNC_EXIT} -ne 0 ]; then
+        echo "[$(date)] ERROR: Tautulli rsync exited with code ${TAUTULLI_RSYNC_EXIT}"
+        [ "${NTFY_ON_FAILURE}" = "true" ] && ntfy_send "Plex Backup FAILED" "Tautulli rsync error (code ${TAUTULLI_RSYNC_EXIT}) — check ${LOG_DIR}" "high"
+        exit ${TAUTULLI_RSYNC_EXIT}
+    fi
+    echo "[$(date)] Tautulli backup complete"
+fi
+
+# --- Run validation ---
+VALIDATE_SCRIPT="$(dirname "$0")/plex-backup-validate.sh"
+if [ -x "${VALIDATE_SCRIPT}" ]; then
+    echo "[$(date)] Running validation"
+    "${VALIDATE_SCRIPT}"
+else
+    echo "[$(date)] WARNING: Validation script not found or not executable: ${VALIDATE_SCRIPT}"
+fi
+
 [ "${NTFY_ON_SUCCESS}" = "true" ] && ntfy_send "Plex Backup OK" "Backup completed successfully" "default"
 
 # --- Prune old logs ---
