@@ -14,6 +14,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
 ---
 
+## [0.3.3] - 2026-06-21
+
+### Changed
+- setup.sh cron step now shows both the existing and replacement entry side-by-side before prompting; the redundant second confirmation is removed when replacing an existing entry
+
+---
+
 ## [0.3.2] - 2026-06-21
 
 ### Changed

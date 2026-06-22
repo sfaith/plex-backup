@@ -536,10 +536,22 @@ if echo "${EXISTING_CRON}" | grep -q "plex-backup"; then
   warn "Existing plex-backup cron entries found:"
   echo "${EXISTING_CRON}" | grep "plex-backup" | sed 's/^/    /'
   echo
-  confirm "Replace existing plex-backup cron entries?" || SKIP_CRON=true
-fi
-
-if [[ "${SKIP_CRON}" == "false" ]]; then
+  echo "  Will be replaced with:"
+  echo
+  echo "    ${CRON_BACKUP}"
+  echo
+  if confirm "Replace existing plex-backup cron entries?"; then
+    CLEAN_CRON=$(echo "${EXISTING_CRON}" | grep -v "plex-backup" || true)
+    {
+      [[ -n "${CLEAN_CRON}" ]] && echo "${CLEAN_CRON}"
+      echo "${CRON_BACKUP}"
+    } | crontab -u root -
+    success "Cron entry written."
+  else
+    SKIP_CRON=true
+    warn "Skipping cron — existing entries unchanged."
+  fi
+else
   if confirm "Write this cron entry?"; then
     CLEAN_CRON=$(echo "${EXISTING_CRON}" | grep -v "plex-backup" || true)
     {
@@ -548,6 +560,7 @@ if [[ "${SKIP_CRON}" == "false" ]]; then
     } | crontab -u root -
     success "Cron entry written."
   else
+    SKIP_CRON=true
     warn "Skipping cron — add entry manually with: crontab -e"
   fi
 fi
