@@ -136,8 +136,12 @@ if [[ "${#MISSING_TOOLS[@]}" -gt 0 ]]; then
   fi
 fi
 
-[[ ! -f "${BACKUP_EXAMPLE}" ]]   && error "Missing: ${BACKUP_EXAMPLE} — run setup.sh from the repo directory."
-[[ ! -f "${VALIDATE_EXAMPLE}" ]] && error "Missing: ${VALIDATE_EXAMPLE} — run setup.sh from the repo directory."
+if [[ ! -f "${BACKUP_EXAMPLE}" ]]; then
+  error "Missing: ${BACKUP_EXAMPLE} — run setup.sh from the repo directory."
+fi
+if [[ ! -f "${VALIDATE_EXAMPLE}" ]]; then
+  error "Missing: ${VALIDATE_EXAMPLE} — run setup.sh from the repo directory."
+fi
 success "Example scripts found."
 
 # -----------------------------------------------------------------------------
@@ -198,11 +202,11 @@ configure_nfs() {
     fi
     while [[ -z "${CFG_NFS_EXPORT}" ]]; do
       prompt CFG_NFS_EXPORT      "NFS export         " "${CFG_NFS_EXPORT}"      "192.168.1.93:/volume1/Backups"
-      [[ -z "${CFG_NFS_EXPORT}" ]] && warn "NFS export is required."
+      if [[ -z "${CFG_NFS_EXPORT}" ]]; then warn "NFS export is required."; fi
     done
     while [[ -z "${CFG_NFS_MOUNT_POINT}" ]]; do
       prompt CFG_NFS_MOUNT_POINT "NFS mount point    " "${CFG_NFS_MOUNT_POINT}" "/mnt/nfs/nas03/backups"
-      [[ -z "${CFG_NFS_MOUNT_POINT}" ]] && warn "NFS mount point is required."
+      if [[ -z "${CFG_NFS_MOUNT_POINT}" ]]; then warn "NFS mount point is required."; fi
     done
     prompt CFG_NFS_OPTS    "NFS mount options  " "${CFG_NFS_OPTS}"
     local default_dest="${CFG_NFS_MOUNT_POINT}/Plex"
@@ -213,7 +217,9 @@ configure_nfs() {
     CFG_NFS_MOUNT_POINT=""
     prompt CFG_BACKUP_DEST "Backup destination " "${CFG_BACKUP_DEST}" "/mnt/backups/Plex"
   fi
-  [[ -z "${CFG_BACKUP_DEST}" ]] && error "Backup destination is required."
+  if [[ -z "${CFG_BACKUP_DEST}" ]]; then
+    error "Backup destination is required."
+  fi
 }
 
 configure_logging() {
@@ -228,13 +234,15 @@ configure_ntfy() {
   if confirm "Configure ntfy alerting?"; then
     prompt CFG_NTFY_TOPIC "ntfy topic         " "${CFG_NTFY_TOPIC}" "my-plex-backup"
     prompt CFG_NTFY_URL   "ntfy server URL    " "${CFG_NTFY_URL}"
-    [[ -z "${CFG_NTFY_TOPIC}" ]] && error "ntfy topic is required when alerting is enabled."
+    if [[ -z "${CFG_NTFY_TOPIC}" ]]; then
+      error "ntfy topic is required when alerting is enabled."
+    fi
     echo
     menu CFG_NTFY_ON_FAILURE 1 "Alert on failure (recommended)" "No failure alerts"
-    [[ "${CFG_NTFY_ON_FAILURE}" == "1" ]] && CFG_NTFY_ON_FAILURE="true" || CFG_NTFY_ON_FAILURE="false"
+    if [[ "${CFG_NTFY_ON_FAILURE}" == "1" ]]; then CFG_NTFY_ON_FAILURE="true"; else CFG_NTFY_ON_FAILURE="false"; fi
     echo
     menu CFG_NTFY_ON_SUCCESS 2 "Alert on success" "No success alerts (recommended)"
-    [[ "${CFG_NTFY_ON_SUCCESS}" == "1" ]] && CFG_NTFY_ON_SUCCESS="true" || CFG_NTFY_ON_SUCCESS="false"
+    if [[ "${CFG_NTFY_ON_SUCCESS}" == "1" ]]; then CFG_NTFY_ON_SUCCESS="true"; else CFG_NTFY_ON_SUCCESS="false"; fi
   else
     CFG_NTFY_TOPIC=""
   fi
@@ -254,7 +262,9 @@ configure_tautulli() {
       CFG_TAUTULLI_BACKUP_DEST="${CFG_NFS_MOUNT_POINT}/Tautulli"
     fi
     prompt CFG_TAUTULLI_BACKUP_DEST "Tautulli backup    " "${CFG_TAUTULLI_BACKUP_DEST}" "/mnt/nfs/nas03/backups/Tautulli"
-    [[ -z "${CFG_TAUTULLI_BACKUP_DEST}" ]] && error "Tautulli backup destination is required."
+    if [[ -z "${CFG_TAUTULLI_BACKUP_DEST}" ]]; then
+      error "Tautulli backup destination is required."
+    fi
   else
     CFG_TAUTULLI_ENABLED="false"
   fi
