@@ -14,6 +14,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
 ---
 
+## [0.3.7] - 2026-06-23
+
+### Fixed
+- setup.sh: bare `[[ ]] && error/warn` patterns replaced with proper `if` blocks throughout — under `set -euo pipefail`, a false `[[ ]]` condition returns exit code 1 which killed the script silently on stricter bash environments (reproduced on CentOS Stream 9; Debian was unaffected due to subtle `set -e` scoping differences). Affected locations: example file existence checks, NFS export/mount point loop guards, backup destination required check, ntfy topic required check, ntfy menu ternaries, and Tautulli backup destination required check.
+
+---
+
 ## [0.3.6] - 2026-06-21
 
 ### Changed
